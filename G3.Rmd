@@ -1,0 +1,420 @@
+---
+title: "[States of India](https://github.com/sid-computing/indian-states-analysis)"
+subtitle: "Data Analysis"
+author: 
+  - ""
+  - ""
+  - "GROUP 3"
+  - "GAGAN, SWAPNIL, PAWAN, TRIDHAM, SIDDHANT, ASHISH"
+output: 
+  slidy_presentation:
+    footer: "Indian Statistical Institute"
+---
+
+```{r,echo=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = TRUE, message = TRUE)
+library(ggplot2); library(lattice)
+library(tidyr)
+library(plotly)
+library(dplyr)
+#library(patchwork)
+#library(tidyverse)
+library(ggrepel)
+
+
+library(readr); library(readxl)
+library(tidyr)
+
+load("C:\\Desktop\\obj.RData")  ##change the location for your device
+#url to download the file: https://github.com/sid-computing/indian-states-analysis/blob/main/obj.RData
+```
+
+### Trend in growth of per capita NSDP across the states of India
+
+```{r,echo=TRUE, message=FALSE,warning=FALSE}
+
+
+
+p2 <- ggplot(pc_nsdp_long, aes(x = period, 
+                                y = log(amount_rs), 
+                                color = state_ut,
+             tooltip=state_ut))+
+  geom_point(size = 2, alpha = 0.7) +
+  geom_line(aes(group = state_ut), alpha = 0.5) +
+  labs(title = "per capita NSDP of States",
+       x = "Period",
+       y = "Log(Amount in Rs)")+theme(
+    legend.position = "none",
+    axis.title.x = element_text(size = .2),
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
+  )
+
+(ggplotly(p2))
+
+```
+
+**Of the top 4 states, all have significantly low area. Two of them have urbanization. There has been an immense gap between among the top 4 and the other states' NSDP since 2011. These states have specialized in sectors like, tourism and manufacturing. Bihar, with the lowest value, has far greater gap in NSDP with the NSDP of UP (the second lowest). The fall in NSDP per capita in 2021-22 was due to COVID-19 and the country-wide lockdown. The NSDP per capita in 2023-24 has been the highest since 2011-12. The bottom two rely heavily on agriculture.**
+
+### Accounting for the observations in the time-series plot.
+```{r,echo=TRUE, message=FALSE,warning=FALSE}
+
+#View(sector_states)
+print("Five number summary of industry section A (NIC 2008) i.e.,  agriculture, forestry and fishing")
+summary(sectors$`Industry Sections of NIC-2008 (A)`)
+sectors_sub= sectors[, c(1,2)]
+names(sectors_sub)[2]="agr_for_fis"
+print(head(sectors_sub[order(-sectors_sub$agr_for_fis),],10))
+print(head(sectors_sub[order(sectors_sub$agr_for_fis),],10))
+
+print("fivenum for area of states")
+print(summary(cmie_sub$Area))  ##in '000 hectares= '0 km
+sub=subset(cmie, select = c("States","Area"), States %in% c("bihar","uttar pradesh","goa","sikkim","chandigarh","nct of delhi"))
+sub$Area=as.numeric(sub$Area)
+print("outliers for the variable, NSDP per capita")
+print(head(sub[order(-sub$Area),],10))
+```
+
+**As thought, the top 4 states in per capita NSDP are among the bottom 10 states w.r.t. labour force participation in agriculture, fishing and forestry. Whereas, the bottom 2 states in the former are among the top 10 in the later. Insistingly, with the exception of Sikkim, all the 6 states are outliers when it comes to the industry section A (NIC 2008). The dominant sector in UP in terms of NSVA is services. The data for the other states is unavailable.**
+
+### Economic Composition of the Top 5 State Economies
+**The five largest state economies in India (by NSVA at basic prices) are driven primarily by the Services sector, with services share exceeding 50%.**
+
+```{r,echo=TRUE, message=FALSE, warning=FALSE}
+plot_data=cmie[,c(1,9,11,12,13,10)]
+colnames(plot_data)=c("states","lit.rate","share.agr","share.ind","share.ser","nsva") #nsva: state's net contribution to GDP
+plot_data[,2:6]=lapply(plot_data[,2:6], as.numeric)
+plot_data= plot_data[order(-plot_data$nsva),] #- minus inverts decreasing= FALSE
+
+plot_data=plot_data[-1,] 
+sub=plot_data[1:5,]
+plot_long= pivot_longer(sub,
+                        cols= c(share.agr, share.ind, share.ser),
+                        names_to = "sector",
+                        values_to = "share")
+
+p=ggplot(plot_long,aes(x = states, y = share, fill = sector)) +
+  geom_col(position = "dodge") +
+  theme_minimal(base_size = 13) +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
+  labs(
+    title = "Sectoral Composition of Top 5 State Economies",
+    x = NULL,
+    y = "Share of NSVA (%)",
+    fill = "Sector"
+  )
+print(p)
+```
+<BR>
+**Result & Interpretation: Maharashtra, Karnataka, and Tamil Nadu are strongly service-led (services share > 50%), confirming the hypothesis. Uttar Pradesh — despite being among the top 5 by absolute size — retains a substantially higher agriculture share, illustrating that size and structural maturity are different things. A large economy can still be relatively undiversified.**
+
+### Top five and Bottom five states holding India's total assets/ liabilities
+```{r,echo=TRUE, message=FALSE, warning=FALSE}
+#Top five states hold most of the India's total assets/ liabilities
+print(head(la.24[(order(la.24$amount_percentage)),c(1,13)],5))
+print(head(la.24[(order(-la.24$amount_percentage)),c(1,13)],6))
+hist(la.24[-21,]$amount_percentage, main= "Distribution of assets", xlab= "percentage of assets")
+```
+<BR>
+**Highest contribution to total assets/ losses is by Maharashtra (21.59%). The bottom three contribute less than 1%. The distribution of total assets is highly right skewed.**
+
+### Analysing the composition of liabilities and assets
+```{r,echo=TRUE, message=FALSE}
+x4=sapply(la.22[21, 2:6], as.numeric) / as.numeric(la.22[21, 12])*100 
+x5=sapply(la.23[21, 2:6], as.numeric) / as.numeric(la.23[21, 12])*100 
+x6=sapply(la.24[21, 2:6], as.numeric) / as.numeric(la.24[21, 12]) *100
+
+c4=rainbow(length(x4))
+l1=c("capital", "reserves", "deposits", "other liabilities", "borrowings")
+par(mfrow=c(2,2)) 
+pie(x4, col=c4, main="2022", labels=NA)
+pie(x5, col=c4, main="2023", labels=NA)
+pie(x6, col=c4, main="2024", labels=NA)
+plot.new()  
+legend("center", legend = l1, fill = c4, cex = 0.8)
+title("DCC bank Liability Composition (2022-2024)", 
+      outer = TRUE, line = -1, cex.main = 1.5)
+```
+<br>
+**Total deposits in the DCC banks from the savers is the highest contributor of the liabilities** 
+
+<br>
+```{r,echo=TRUE, message=FALSE, warning=FALSE}
+x7=sapply(la.22[21,7:11], as.numeric) / as.numeric(la.22[21, 12])*100 #percentage composition
+x8=sapply(la.23[21,7:11], as.numeric) / as.numeric(la.23[21, 12])*100 
+x9=sapply(la.24[21,7:11], as.numeric) / as.numeric(la.24[21, 12]) *100
+
+c5=rainbow(length(x4))
+l2=c("Balances in Current Account", "Investments+ balances in deposit account", "Loans And Advances","Other Assets","Accumulated Losses")
+par(mfrow=c(2,2)) #1 row, 3 col
+pie(x7, col=c4, main="2022", labels=NA)
+pie(x8, col=c4, main="2023", labels=NA)
+pie(x9, col=c4, main="2024", labels=NA)
+plot.new()  # Create empty plot
+legend("center", legend = l2, fill = c5, cex = 0.8)
+title("DCC bank Assets Composition (2022-2024)", 
+      outer = TRUE, line = -1, cex.main = 1.5)
+```
+<br>
+**Total loans by the DCC banks is the highest contributor of the assets**
+
+**Correlation between Deposits and Loans for 2022**
+<br>
+```{r,echo=TRUE, message=FALSE, warning=FALSE}
+dl.22=cor(la.22$deposits, la.22$loans_n_adv)  
+dl.23=cor(la.23$deposits, la.23$loans_n_adv)
+dl.24=cor(la.24$deposits, la.24$loans_n_adv)
+
+cat(" 2022: ", dl.22, "\n","2023: ", dl.23, "\n","2024: ", dl.24)
+```
+
+
+
+
+### Analysing the borrowings and accumulated losses for DCC banks in the 4 CDR categories (the values are in Rs Cr)
+
+Criterion for the CDR categories
+<ls>
+<li> Very low: <50% </li>
+<li> Low: 50% to 70% </li>
+<li> Moderate: 70% to 90% </li>
+<li> High: >90% </li> </ls>
+
+
+```{r,echo=TRUE, message=FALSE, warning=FALSE}
+#what is the trend of the accumulated losses and the borrowings in high CDR states
+#x=tapply(la.24, list(la.24$CDR_category), function(df) summary(df$borrowings))
+#print("fivenumber summary for the borrowings in the 4 CDR categories (the values are in Rs Cr") 
+#x
+print(bwplot(~log(borrowings)|CDR_category, la.24[-21,], layout=c(1,4), main= "Borrowings for CDR categories"))
+```
+<BR>**As expected, there is excess liquidity (transferrable cash) in very low CDR states. Whereas in high CDR states, due to high credit demand, they banks have to borrow from NABARD.**
+
+```{r,echo=TRUE, message=FALSE, warning=FALSE}
+#x=tapply(la.24, list(la.24$CDR_category), function(df) summary(df$accum_losses))
+#x
+print(bwplot(~log(accum_losses)|CDR_category, la.24[-21,], layout=c(1,4),main= "Loans And Advances for CDR categories"))
+```
+<BR>
+<b>This is surprising because intuition would suggest:
+High CDR = aggressive lending = more bad loans = higher losses
+But we're seeing the opposite.
+In cooperative banking, inactivity is riskier than activity. In high CDR states, interest income from a large loan covers the bank's fixed operating costs. In this case, low CDR states' DCC banks are the lazy banks; they are bound to sustain agriculture (savings oriented).</b>
+
+### Behaviour of DCC Banks
+
+```{r,echo=TRUE, message=FALSE, warning=FALSE}
+
+plot_data=data.frame(la.24$state_ut,cmie_sub$Urbanisation,la.24$amount_percentage, la.24$CDR, la.24$CDR_category)
+colnames(plot_data)=c("state_ut", "urbanisation", "total_assets", "cdr","cdr_category")
+plot_data$urbanisation=as.numeric(plot_data$urbanisation)
+plot_data=plot_data[-21,]
+
+plot_data$urban_category <- ifelse(plot_data$urbanisation < 30, "low",
+                                   ifelse(plot_data$urbanisation <= 40, 
+                                          "moderate", "high"))
+#y=lm(total_assets~ urbanisation, data=plot_data)
+#plot(total_assets~ urbanisation, data=plot_data, pch=15)
+#abline(y,col="red",lwd=2, lty=2)
+
+xyplot(cdr~ urbanisation |cdr_category, data = plot_data,
+       layout=c(4,1),
+       panel = function(x, y, ...) {
+         panel.dotplot(x, y, ...) # draws the points/lines
+         #panel.text(x, y, labels = plot_data$state_ut, pos = 4, cex = 0.7)  #adds labels
+         panel.lmline(x, y, col = "red", lty = 2) #adds lm
+       },
+       pch=15,
+       alpha=.5,
+       cex=2)
+
+plot_data= cbind(plot_data, cmie_sub[-21,]$`Projects completed` )
+names(plot_data)[7]="proj.comp"
+xyplot(cdr~(proj.comp)|cdr_category, data=plot_data,
+        ylab="credit to debt ratio (2024)",
+        xlab="pojects completed in Rs. million (2024-25)",
+        layout=c(4,1),
+       panel= function(x,y,...){
+         panel.dotplot(x,y, ...)
+         panel.lmline(x,y, col="red", lty=2, lwd=2)
+         #panel.text(x, y, labels= plot_data$state_ut, pos=4, cex=.7)
+       },
+       pch=15,
+       alpha=.5,
+       cex=2)
+
+
+plot_data= cbind(plot_data, cmie_sub[-21,]$`New investment  projects`)
+names(plot_data)[8]="proj.invs"
+xyplot(cdr~(proj.invs)|cdr_category, data=plot_data,
+        ylab="credit to debt ratio (2024)",
+        xlab="new investment projects in Rs. million (2024-25)",
+        layout=c(4,1),
+       panel= function(x,y,...){
+         panel.dotplot(x,y, ...)
+         panel.lmline(x,y, col="red", lty=2, lwd=2)},
+       pch=15,
+       alpha=.5,
+       cex=2)
+```
+<BR>
+**As a state completes more industrial projects (urbanization increases), the economic focus shifts away from the rural/agricultural sectors that DCC banks serve. Consequently, while the state grows, the specific credit niche of DCC banks shrinks relative to the total economy. Hence, the economic paradox of high investment/infrastructure but low credit.**
+
+**With the exception of states with very low CDR, all other states have positive correlation b/w CDR and urbanisation. This hints towards more active lending. There is a shift from credits for seeds and fertilizers to that for vehicles and durables. In the states with very low CDR, the extra money from deposits has been transferred to NABARD bonds.**
+
+### Power Generation vs Agricultural Activity (Energy-Irrigation Nexus)
+**States with larger gross cropped areas generate more electricity because irrigation pump-sets, cold storage, and agro-processing create a direct agricultural demand for power.**
+
+```{r,echo=TRUE, message=FALSE, warning=FALSE}
+plot_data= cmie[, c(1,15,24)]|>
+  drop_na()
+plot_data[,2:3]=lapply(plot_data[,2:3], as.numeric)
+colnames(plot_data)=c("states","gca","elec.gen")
+
+x=with(plot_data, cor(gca, elec.gen))
+  
+ggplot(plot_data[-34,], aes(x=gca,y=elec.gen, label = states)) +
+    geom_point(size = 2.5, colour = "#27ae60") +
+    geom_smooth(method = "lm", se = TRUE) +
+    geom_text_repel(size = 3, max.overlaps = 15) +
+    labs(title = "Q20: Gross Cropped Area vs Electricity Generation",
+         subtitle = paste0("Pearson r = ", round(x, 3),
+                           "  |  Energy-Irrigation Nexus"),
+         x = "Gross cropped area (hectares)",
+         y = "Electricity generation (million kWh)") +
+    theme_minimal(base_size = 13)
+```
+
+<BR>**Strong positive correlation. Rajasthan (largest cropped area after Madhya Pradesh), Maharashtra, and UP are simultaneously major agricultural producers and major electricity consumers/generators. The nexus is causal in both directions: more irrigation requires more power, and more power availability enables irrigation expansion. Policy that restricts agricultural electricity subsidies therefore directly constrains crop output.**
+
+### Literacy Leaders and Laggards
+**Southern and island/UT states (Kerala, Lakshadweep, Chandigarh, Mizoram) will have literacy rates above 85%, while northern populous states (Bihar, Uttar Pradesh) will remain below 70%, reflecting deep regional disparities in educational investment.**
+```{r,echo=TRUE, message=FALSE, warning=FALSE}
+
+plot_data = cmie[, c(1, 9)] |> drop_na()
+colnames(plot_data) = c("states", "lit.rate")
+plot_data$lit.rate = as.numeric(plot_data$lit.rate)
+
+ggplot(plot_data, aes(x = reorder(states, lit.rate),
+                   y = lit.rate, fill = lit.rate)) +
+  geom_col() +
+  coord_flip() +
+  scale_fill_gradient(low = "#e74c3c", high = "#27ae60") +
+  geom_hline(yintercept = 73, linetype = "dashed", colour = "grey30") +
+  annotate("text", x = 3, y = 75, label = "National avg ~73%", size = 3) +
+  labs(title = "Q6: Literacy Rate by State (Ranked)",
+       x = NULL, y = "Literacy rate (%)", fill = "Rate (%)")
+
+```
+<BR>**Result & Interpretation: Kerala leads at ~94%, followed by Lakshadweep (~91.8%) and Chandigarh (~86%). Bihar sits near the bottom at ~62%. The north-south and rural-urban divide is stark. States that have historically underinvested in primary schooling, had higher child labour rates, and lower female autonomy show persistently low literacy — a structural development trap rather than a short-term policy failure.**
+
+### Education and Industrial/Services Shift
+**Higher state literacy enables a workforce shift from agriculture into industry and services. The correlation between literacy and services share should be stronger than between literacy and industry share, because India’s post-liberalisation growth has been predominantly services-led.**
+
+```{r,echo=TRUE, message=FALSE, warning=FALSE}
+plot_data=cmie[,c(1,9,11,12,13)]
+colnames(plot_data)=c("states","lit.rate","share.agr","share.ind","share.ser")
+plot_data[,2:5]=lapply(plot_data[,2:5], as.numeric)
+r_ind=with(plot_data, cor(lit.rate, share.ind, use="complete.obs"))
+r_serv=with(plot_data, cor(lit.rate, share.ser, use="complete.obs"))
+cat("Correlation — literacy vs industry share :", round(r_ind, 4), "\n")
+cat("Correlation — literacy vs services share :", round(r_serv, 4), "\n")
+
+ggplot(plot_data, aes(lit.rate, share.ind, label = states)) +
+  geom_point(size = 2.5, colour = "#9b59b6") +
+  geom_smooth(method = "lm", se = TRUE) +
+  geom_text_repel(size = 3, max.overlaps = 10) +
+  labs(
+    subtitle = paste0("Industry: r = ", round(r_ind, 3)),
+    x = "Literacy (%)",
+    y = "Industry share (%)")
+
+#scales::alpha("red", alpha=1)
+ggplot(plot_data, aes(lit.rate, share.ser, label = states)) +
+  geom_point(size = 2.5, colour = "yellow") +
+  geom_smooth(method = "lm", se = TRUE) +
+  geom_text_repel(size = 3, max.overlaps = 10) +
+  labs(
+    subtitle = paste0("Service: r = ", round(r_serv, 3)),
+    x = "Literacy (%)",
+    y = "Services share (%)")
+```
+<BR>
+**Literacy correlates more strongly with services share than with industry share. This confirms India’s development pattern: education enables entry into IT, banking, insurance, healthcare, and education sectors, all of which are knowledge-intensive services. Traditional manufacturing can absorb lower-literacy workers in assembly, textiles, and processing — hence the weaker literacy-industry link.**
+
+
+
+### How does the immense scale of a state's population density impact its literacy rate, and which states manage to break this trend?
+
+```{r q1, echo=TRUE, fig.width=10, fig.height=6, fig.align="center", warning=FALSE}
+ggplot(df_clean, aes(x = `Population.density`, y = `Literacy.rate`)) +
+  geom_point(aes(size = Population), color = "purple", alpha = 0.7) +
+  geom_text_repel(aes(label = States), 
+                  size = 2.35, 
+                  max.overlaps = Inf, 
+                  segment.color = NA) +
+  scale_x_log10() + 
+  geom_smooth(method = "lm", color = "red", linetype = "dashed", se = FALSE) +
+  labs(title = "Density vs. Literacy",
+       x = "Population Density (Log Scale)", 
+       y = "Literacy Rate (%)",
+       size = "Total Population") +
+  theme_minimal()
+```
+<BR>
+**The hypothesis that density hurts education is false. The data shows a positive correlation (+0.232). High-density urban centers and Union Territories (like Delhi, Chandigarh, and Lakshadweep) have the highest literacy rates. The real educational struggle lies in the massive, sprawling agrarian states (like Bihar, UP, and Rajasthan), where geographic scale makes infrastructure difficult to maintain.**
+
+### Does a higher literacy rate naturally lead to better child gender parity, or are educationally advanced states still failing their future generations?
+```{r q2, echo=TRUE, fig.width=10, fig.height=6, fig.align="center", warning=FALSE}
+ggplot(df_clean, aes(x = `Literacy.rate`, y = `Child.gender.ratio`)) +
+  geom_point(aes(color = `Urbanisation`), size = 4) +
+  scale_color_gradient(low = "lightblue", high = "darkblue") +
+  geom_hline(yintercept = 950, linetype = "dotted", color = "red", size = 1) +
+  geom_text(aes(label = States), vjust = 1.5, size = 3, check_overlap = TRUE) +
+  labs(title = "Does Literacy Equal Parity?",
+       subtitle = "Red dotted line indicates a concerningly low threshold (950 females/1000 males)",
+       x = "Literacy Rate (%)", 
+       y = "Child Gender Ratio (Females per 1000 Males)",
+       color = "Urbanisation (%)") +
+  theme_bw()
+```
+<BR>**Literacy does not equate to gender parity (Correlation: +0.077). Alarmingly, many highly literate (>80%) and highly urbanized states such as Maharashtra, Delhi, and Goa fall severely below the 950 parity threshold. This indicates that poor child gender ratios in these regions are driven by deeper socio-cultural factors, not a lack of education.**
+
+### Is domestic air travel becoming a democratized mode of transport, or is it strictly tied to highly urbanized wealth centers?
+```{r q3, echo=TRUE, fig.width=10, fig.height=6, fig.align="center", warning=FALSE}
+ggplot(df_clean, aes(x = Urbanisation, y = `Air.passenger..traffic.per.million..population`)) +
+  geom_point(aes(size = `Population`), color = "skyblue", alpha = 0.8) +
+  geom_text_repel(aes(label = States), size = 2.35, max.overlaps = Inf, segment.color = "grey80") +
+  geom_smooth(method = "lm", color = "navy", linetype = "dashed", se = FALSE) +
+  scale_y_log10() + # Log scale due to massive variance between Delhi/Goa and rural states
+  labs(title = "The Flight Inequality Gap",
+       x = "Urbanisation (%)", 
+       y = "Air Traffic per Million Population (Log Scale)",
+       size = "Total Population") +
+  theme_light()
+```
+<BR>**Air travel remains deeply unequal (Correlation: +0.681). Massive rural states like Bihar and Uttar Pradesh see virtually zero air traffic relative to their populations. Meanwhile, highly urbanized anomalies like Delhi, Goa, and Chandigarh dominate the skies. Air infrastructure is heavily gatekept by urbanization.**
+
+### Does extreme population density reduce a state's per capita energy usage through shared infrastructure (apartments, mass transit), or does it increase it?
+```{r q4, echo=TRUE, fig.width=10, fig.height=6, fig.align="center", warning=FALSE}
+ggplot(df_clean, aes(x = `Population.density`, y = `Per.capita.energy..consumption`)) +
+  geom_point(color = "orange", size = 2) +
+  geom_text_repel(aes(label = States), size = 2, max.overlaps = Inf, segment.color = NA) +
+  scale_x_log10() +
+  geom_smooth(method = "lm", color = "red", se = FALSE) +
+  labs(title = "Density vs. Energy",
+       x = "Population Density (Log Scale)", 
+       y = "Per Capita Energy Consumption (Kwh)") +
+  theme_light()
+```
+<BR>**Extreme density does not magically create energy efficiency. The correlation is slightly positive (+0.192), meaning denser states actually consume slightly more power per person. However, the true energy anomalies are Punjab and Haryana, which have moderate density but towering energy consumption. This is heavily driven by free agricultural power subsidies (groundwater pumping) rather than urban consumer lifestyles.**
+
+### Contacts:
+
+<ul>
+<li>Ashish BSDBG2502@ISIBG.AC.IN </li>
+<li>Pawan Kumar BSDDH2517@ISID.AC.IN </li>
+<li>Swapnil Mondal BSDCC2521@ISCC.AC.IN </li>
+<li>Gagan Krishna S BSDBG2506@ISIBG.AC.IN </li>
+<li>Siddhant Shrivastava BSDDH2421@ISID.AC.IN </li>
+<li>Dudam Tridham Sai BSDCC2505@ISICC.AC.IN </li>
+</ul>
